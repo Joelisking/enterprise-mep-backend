@@ -172,10 +172,36 @@ JWT_EXPIRES_IN=7d
 CORS_ORIGINS=http://localhost:3000
 ```
 
+## Git hooks (Husky)
+
+Husky is configured in this repo with two hooks:
+
+| Hook | Command | When it runs |
+|---|---|---|
+| `pre-commit` | `lint-staged` | Auto-fixes and re-stages only the files you've staged — blocks only on errors ESLint can't auto-correct |
+| `pre-push` | `npm run build` | Before every push — blocks if NestJS build (tsc) fails |
+
+`lint-staged` is configured in `package.json`:
+```json
+"lint-staged": {
+  "{src,test}/**/*.ts": "eslint --fix"
+}
+```
+
+It only touches files you've already staged, applies `--fix`, and re-stages the result. You only need to intervene if there's a genuine lint error that ESLint cannot auto-correct. Use `npm run lint` to manually run the full lint with auto-fix at any time.
+
+Hooks are set up automatically on `npm install` via the `prepare` script. No manual setup needed after cloning.
+
+To skip hooks in an emergency (use sparingly):
+```bash
+git commit --no-verify
+git push --no-verify
+```
+
 ## Running locally
 
 ```bash
-npm install
+npm install   # also sets up git hooks via prepare script
 npm run prisma:generate
 npm run prisma:migrate:dev
 npm run prisma:seed
