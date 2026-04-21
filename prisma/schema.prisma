@@ -1,0 +1,148 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Auth ────────────────────────────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  password  String
+  role      UserRole @default(MANAGER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  VIEWER
+}
+
+// ─── Sites ───────────────────────────────────────────────────────────────────
+
+model Site {
+  id              String   @id
+  name            String
+  location        String
+  supervisor      String
+  supervisorPhone String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  tasks           Task[]
+
+  @@map("sites")
+}
+
+// ─── Tasks ───────────────────────────────────────────────────────────────────
+
+model Task {
+  id                      String         @id @default(uuid())
+  siteId                  String
+  site                    Site           @relation(fields: [siteId], references: [id])
+  scope                   Scope
+  taskName                String
+  status                  TaskStatus
+  progressPercent         Int            @default(0)
+  previousProgressPercent Int            @default(0)
+  estimatedDays           Int
+  daysElapsed             Int
+  qualityRating           Int
+  date                    String
+  notes                   String         @default("")
+  technicians             Technician[]
+  materialsUsed           TaskMaterial[]
+  comments                Comment[]
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+
+  @@map("tasks")
+}
+
+enum Scope {
+  PLUMBING
+  ELECTRICAL
+  AC_WORKS
+}
+
+enum TaskStatus {
+  IN_PROGRESS
+  COMPLETED
+  HALTED
+}
+
+model Technician {
+  id     String         @id @default(uuid())
+  taskId String
+  task   Task           @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  name   String
+  role   TechnicianRole
+
+  @@map("technicians")
+}
+
+enum TechnicianRole {
+  PLUMBER
+  ELECTRICIAN
+  AC_TECHNICIAN
+  HELPER
+  SUPERVISOR
+}
+
+model TaskMaterial {
+  id         String   @id @default(uuid())
+  taskId     String
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  materialId String
+  material   Material @relation(fields: [materialId], references: [id])
+  quantity   Float
+
+  @@map("task_materials")
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author    String
+  text      String
+  date      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("comments")
+}
+
+// ─── HR ──────────────────────────────────────────────────────────────────────
+
+model HrRate {
+  id           String   @id @default(uuid())
+  role         String   @unique
+  dailyRateGHS Float
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("hr_rates")
+}
+
+// ─── Procurement ─────────────────────────────────────────────────────────────
+
+model Material {
+  id            String         @id
+  materialName  String
+  unitCostGHS   Float
+  unit          String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  taskMaterials TaskMaterial[]
+
+  @@map("materials")
+}
