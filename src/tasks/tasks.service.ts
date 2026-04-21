@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { CreateCommentDto } from './dto/create-comment.dto';
+import { BulkCreateTasksDto } from './dto/bulk-create-tasks.dto';
 import { Scope, TaskStatus } from '@prisma/client';
 
 const TASK_INCLUDE = {
@@ -83,5 +84,67 @@ export class TasksService {
     const comment = await this.prisma.comment.findFirst({ where: { id: commentId, taskId } });
     if (!comment) throw new NotFoundException(`Comment ${commentId} not found on task ${taskId}`);
     await this.prisma.comment.delete({ where: { id: commentId } });
+  }
+
+  async bulkCreate(dto: BulkCreateTasksDto) {
+    // Auto-create any sites that don't exist yet
+    const uniqueSiteIds = [...new Set(dto.tasks.map(t => t.siteId))];
+    const existingSites = await this.prisma.site.findMany({
+      where: { id: { in: uniqueSiteIds } },
+      select: { id: true },
+    });
+    const existingIds = new Set(existingSites.map(s => s.id));
+    const missingSiteIds = uniqueSiteIds.filter(id => !existingIds.has(id));
+
+    if (missingSiteIds.length) {
+      await this.prisma.site.createMany({
+        data: missingSiteIds.map(id => ({
+          id,
+          name: dto.siteHints?.find(h => h.id === id)?.name
+            ?? id.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+          location: 'Unknown',
+          supervisor: 'TBC',
+          supervisorPhone: 'TBC',
+        })),
+        skipDuplicates: true,
+      });
+    }
+
+    // Upsert tasks sequentially — each task is its own implicit or mini transaction
+    // to avoid hitting the 5s interactive transaction timeout on large uploads
+    const results = [];
+    for (const { technicians, materialsUsed, ...rest } of dto.tasks) {
+      const existing = await this.prisma.task.findFirst({
+        where: { siteId: rest.siteId, taskName: rest.taskName, date: rest.date },
+        select: { id: true },
+      });
+
+      if (existing) {
+        const updated = await this.prisma.$transaction([
+          this.prisma.technician.deleteMany({ where: { taskId: existing.id } }),
+          this.prisma.taskMaterial.deleteMany({ where: { taskId: existing.id } }),
+          this.prisma.task.update({
+            where: { id: existing.id },
+            data: {
+              ...rest,
+              technicians: technicians?.length ? { create: technicians } : undefined,
+              materialsUsed: materialsUsed?.length ? { create: materialsUsed } : undefined,
+            },
+            include: TASK_INCLUDE,
+          }),
+        ]);
+        results.push(updated[2]);
+      } else {
+        results.push(await this.prisma.task.create({
+          data: {
+            ...rest,
+            technicians: technicians?.length ? { create: technicians } : undefined,
+            materialsUsed: materialsUsed?.length ? { create: materialsUsed } : undefined,
+          },
+          include: TASK_INCLUDE,
+        }));
+      }
+    }
+    return results;
   }
 }

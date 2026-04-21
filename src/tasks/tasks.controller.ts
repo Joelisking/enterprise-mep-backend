@@ -12,6 +12,7 @@ import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { CreateCommentDto } from './dto/create-comment.dto';
+import { BulkCreateTasksDto } from './dto/bulk-create-tasks.dto';
 import { TaskEntity } from './entities/task.entity';
 import { CommentEntity } from './entities/comment.entity';
 
@@ -27,6 +28,13 @@ export class TasksController {
   @ApiCreatedResponse({ type: TaskEntity })
   create(@Body() dto: CreateTaskDto) {
     return this.tasksService.create(dto);
+  }
+
+  @Post('bulk')
+  @ApiOperation({ summary: 'Bulk upsert tasks from Excel upload — auto-creates unknown sites' })
+  @ApiCreatedResponse({ type: [TaskEntity] })
+  bulkCreate(@Body() dto: BulkCreateTasksDto) {
+    return this.tasksService.bulkCreate(dto);
   }
 
   @Get()
