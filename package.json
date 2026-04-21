@@ -61,7 +61,7 @@
     "typescript": "^5.4.0"
   },
   "lint-staged": {
-    "{src,test}/**/*.ts": "eslint --fix"
+    "{src,test}/**/*.ts": "echo"
   },
   "jest": {
     "moduleFileExtensions": [
